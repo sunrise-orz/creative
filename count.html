@@ -1,0 +1,182 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>テキスト情報カウンター - テキスト編集ツール</title>
+<meta name="description" content="テキスト情報カウンターは、文字数、行数、段落数、原稿用紙換算を簡単にカウントできるオンラインツールです。テキスト編集機能も備えています。">
+<meta name="keywords" content="テキストカウンター, 文字数カウント, テキスト編集, オンラインツール,文字数">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/selection/rectangular-selection.min.js"></script>
+<style>
+.input-group label,button{margin-right:10px}
+body{font-family:Arial,sans-serif;max-width:800px;margin:auto;padding:20px;line-height:1.6;overflow-y:scroll}
+#resultText,.input-group,p{background-color:#f2f2f2;padding:10px}
+#resultText,.CodeMirror{border:1px solid #ccc;border-radius:5px;font-size:16px;margin-bottom:20px;resize:vertical}
+#resultContainer{position:relative}
+#copyButton{position:absolute;top:5px;right:5px;z-index:10}
+#resultText{width:100%;height:150px;box-sizing:border-box;overflow:auto}
+.input-group,p{border-radius:5px;margin-bottom:10px}
+.input-group input{padding:5px}
+button{padding:5px 10px}
+span{font-weight:700}
+</style>
+<script>
+ var editor;
+ document.addEventListener('DOMContentLoaded', function () {
+  editor = CodeMirror.fromTextArea(document.getElementById('textInput'), {
+   lineNumbers: false,
+   mode: "",
+   viewportMargin: Infinity,
+   extraKeys: { "Alt": "rectangularSelection" }
+  });
+  editor.on("change", function () { updateResultText(); });
+  document.getElementById('toggleEditSection').addEventListener('click', function () {
+   toggleSection('textEditSection', this);
+  });
+  document.getElementById('copyButton').addEventListener('click', function () {
+   copyResultText();
+  });
+  document.getElementById('addReplaceField').addEventListener('click', function () {
+   addReplaceField();
+  });
+  document.getElementById('replaceAll').addEventListener('click', function () {
+   replaceAll();
+  });
+ });
+ function updateCounts() {
+  var editorText = editor.getValue();
+  var withSpaces = editorText.length;
+  var withoutSpaces = editorText.replace(/\s/g, '').length;
+  var lines = editorText.split('\n').length;
+  var paragraphs = editorText.replace(/\n$/gm, '').split(/\n/).length;
+  var manuscriptPages = Math.ceil(withoutSpaces / 400);
+  document.getElementById('countWithSpaces').textContent = withSpaces;
+  document.getElementById('countWithoutSpaces').textContent = withoutSpaces;
+  document.getElementById('linesCount').textContent = lines;
+  document.getElementById('paragraphsCount').textContent = paragraphs;
+  document.getElementById('manuscriptPagesCount').textContent = manuscriptPages;
+ }
+ function updateResultText() {
+  var prefix = document.getElementById('prefixText').value;
+  var suffix = document.getElementById('suffixText').value;
+  var editorText = editor.getValue();
+  var resultText = editorText.split('\n').map(line => line ? prefix + line + suffix : line).join('\n');
+  document.getElementById('resultText').value = resultText;
+  updateCounts();
+ }
+ function copyResultText() {
+  var resultText = document.getElementById('resultText').value;
+  navigator.clipboard.writeText(resultText)
+   .catch(err => {
+    console.error('コピーに失敗しました: ', err);
+   });
+ }
+ function addReplaceField() {
+  var container = document.getElementById('replaceFields');
+  var inputGroup = document.createElement('div');
+  inputGroup.className = 'input-group';
+  var findInput = document.createElement('input');
+  findInput.type = 'text';
+  findInput.placeholder = '検索テキスト';
+  findInput.className = 'findText';
+  var replaceInput = document.createElement('input');
+  replaceInput.type = 'text';
+  replaceInput.placeholder = '置き換えテキスト';
+  replaceInput.className = 'replaceText';
+  var replaceNewlineLabel = document.createElement('label');
+  var replaceNewlineCheckbox = document.createElement('input');
+  replaceNewlineCheckbox.type = 'checkbox';
+  replaceNewlineCheckbox.className = 'replaceNewline';
+  replaceNewlineLabel.appendChild(replaceNewlineCheckbox);
+  replaceNewlineLabel.appendChild(document.createTextNode(' 改行に置き換える'));
+  var newlineToTextLabel = document.createElement('label');
+  var newlineToTextCheckbox = document.createElement('input');
+  newlineToTextCheckbox.type = 'checkbox';
+  newlineToTextCheckbox.className = 'newlineToText';
+  newlineToTextLabel.appendChild(newlineToTextCheckbox);
+  newlineToTextLabel.appendChild(document.createTextNode(' 改行を置き換える'));
+  inputGroup.appendChild(findInput);
+  inputGroup.appendChild(replaceInput);
+  inputGroup.appendChild(replaceNewlineLabel);
+  inputGroup.appendChild(newlineToTextLabel);
+  container.appendChild(inputGroup);
+ }
+ function replaceAll() {
+  var findInputs = document.getElementsByClassName('findText');
+  var replaceInputs = document.getElementsByClassName('replaceText');
+  var replaceNewlines = document.getElementsByClassName('replaceNewline');
+  var newlineToTexts = document.getElementsByClassName('newlineToText');
+  var editorText = editor.getValue();
+  var resultText = editorText;
+  for (var i = 0; i < findInputs.length; i++) {
+   var findText = findInputs[i].value;
+   var replaceText = replaceInputs[i].value;
+   var isReplaceNewline = replaceNewlines[i].checked;
+   var isNewlineToText = newlineToTexts[i].checked;
+   if (isReplaceNewline) {
+    resultText = resultText.split(findText).join('\n');
+   } else if (isNewlineToText) {
+    resultText = resultText.replace(/\r\n|\n|\r/g, replaceText);
+   } else {
+    resultText = resultText.split(findText).join(replaceText);
+   }
+  }
+  document.getElementById('resultText').value = resultText;
+  updateCounts();
+ }
+ function toggleSection(sectionId, button) {
+  var section = document.getElementById(sectionId);
+  var isHidden = section.style.display === 'none';
+  section.style.display = isHidden ? 'block' : 'none';
+  button.textContent = isHidden ? 'テキスト編集を隠す' : 'テキスト編集を表示';
+ }
+ function removeEmptyLines() {
+  var editorText = editor.getValue();
+  var lines = editorText.split('\n');
+  var nonEmptyLines = lines.filter(line => line.trim() !== '');
+  var resultText = nonEmptyLines.join('\n');
+  document.getElementById('resultText').value = resultText;
+  updateCounts();
+ }
+</script>
+</head>
+<body>
+<h2>テキスト情報カウンター</h2>
+<textarea id="textInput"></textarea>
+<a>※Alt+ドラッグ で縦列選択(別名：ブロック選択・短形選択)可能です</a>
+<p>文字数(スペース込み): <span id="countWithSpaces">0</span></p>
+<p>文字数(スペース無視): <span id="countWithoutSpaces">0</span></p>
+<p>行数: <span id="linesCount">0</span></p>
+<p>段落数: <span id="paragraphsCount">0</span></p>
+<p>原稿用紙換算(400文字/枚): <span id="manuscriptPagesCount">0</span>枚</p>
+<button id="toggleEditSection">テキスト編集を表示</button>
+<div id="textEditSection" style="display: none;">
+ <h2>テキスト編集</h2>
+ <div id="resultContainer">
+  <textarea id="resultText" readonly></textarea>
+  <button id="copyButton" onclick="copyResultText()">コピー</button>
+ </div>
+ <div class="input-group">
+  <label for="prefixText">行頭に追加:</label>
+  <input type="text" id="prefixText" oninput="updateResultText()">
+ </div>
+ <div class="input-group">
+  <label for="suffixText">行末に追加:</label>
+  <input type="text" id="suffixText" oninput="updateResultText()">
+ </div>
+ <div id="replaceFields">
+  <div class="input-group">
+   <input type="text" placeholder="検索テキスト" class="findText">
+   <input type="text" placeholder="置き換えテキスト" class="replaceText">
+   <label><input type="checkbox" class="replaceNewline"> 改行に置き換える</label>
+   <label><input type="checkbox" class="newlineToText"> 改行を置き換える</label>
+  </div>
+ </div>
+ <button onclick="addReplaceField()">追加</button>
+ <button onclick="replaceAll()">全部置き換え</button>
+ <button onclick="removeEmptyLines()">空の行を削除する</button>
+</div>
+</body>
+</html>
